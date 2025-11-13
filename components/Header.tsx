@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CONTACT_PHONE, WHATSAPP_CHANNEL_LINK } from '../constants';
-import WhatsAppIcon from './icons/WhatsAppIcon';
+import type { Page } from '../App';
 
-const NovaFundingLogo: React.FC = () => (
-    <div className="flex items-center space-x-2">
+const NovaFundingLogo: React.FC<{ onNavigate: (page: 'home') => void }> = ({ onNavigate }) => (
+    <div className="flex items-center space-x-2 cursor-pointer" onClick={() => onNavigate('home')}>
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 7V17L12 22L22 17V7L12 2Z" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M2 7L12 12L22 7" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -15,7 +14,14 @@ const NovaFundingLogo: React.FC = () => (
     </div>
 );
 
-const Header: React.FC = () => {
+
+interface HeaderProps {
+    user: { role: 'user' | 'admin' } | null;
+    onNavigate: (page: Page) => void;
+    onLogout: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ user, onNavigate, onLogout }) => {
     const [scrolled, setScrolled] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -33,17 +39,30 @@ const Header: React.FC = () => {
         { name: 'Reviews', href: '#reviews' },
     ];
     
-    const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    const scrollToSection = (e: React.MouseEvent, href: string) => {
         e.preventDefault();
-        document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+        onNavigate('home');
+        // Need a slight delay for the page to switch back to home before scrolling
+        setTimeout(() => {
+             document.querySelector(href)?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
         setMobileMenuOpen(false);
     };
+    
+    const handleDashboardClick = () => {
+        if(user?.role === 'admin') {
+            onNavigate('admin');
+        } else {
+            onNavigate('dashboard');
+        }
+        setMobileMenuOpen(false);
+    }
 
     return (
-        <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-black/80 backdrop-blur-lg border-b border-yellow-400/20' : 'bg-transparent'}`}>
+        <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled || !!user || mobileMenuOpen ? 'bg-black/80 backdrop-blur-lg border-b border-yellow-400/20' : 'bg-transparent'}`}>
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
-                    <NovaFundingLogo />
+                    <NovaFundingLogo onNavigate={onNavigate} />
                     
                     {/* Desktop Navigation */}
                     <nav className="hidden lg:flex items-center space-x-8">
@@ -55,11 +74,17 @@ const Header: React.FC = () => {
                     </nav>
 
                     <div className="hidden lg:flex items-center space-x-4">
-                        <a href={`tel:${CONTACT_PHONE}`} className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">{CONTACT_PHONE}</a>
-                        <a href={WHATSAPP_CHANNEL_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-transform duration-300 ease-in-out hover:scale-105">
-                            <WhatsAppIcon className="h-5 w-5" />
-                            <span>Join Channel</span>
-                        </a>
+                        {user ? (
+                             <>
+                                <button onClick={handleDashboardClick} className="font-semibold text-white hover:text-yellow-400 transition-colors">Dashboard</button>
+                                <button onClick={onLogout} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded-full transition-colors">Logout</button>
+                            </>
+                        ) : (
+                             <>
+                                <button onClick={() => onNavigate('login')} className="font-semibold text-white hover:text-yellow-400 transition-colors">Login</button>
+                                <button onClick={() => onNavigate('signup')} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded-full transition-colors">Sign Up</button>
+                            </>
+                        )}
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -86,12 +111,18 @@ const Header: React.FC = () => {
                                 {link.name}
                             </a>
                         ))}
-                        <div className="pt-4 border-t border-gray-700 w-full flex flex-col items-center space-y-4">
-                           <a href={`tel:${CONTACT_PHONE}`} className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">{CONTACT_PHONE}</a>
-                            <a href={WHATSAPP_CHANNEL_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-transform duration-300 ease-in-out hover:scale-105 w-48">
-                                <WhatsAppIcon className="h-5 w-5" />
-                                <span>Join Channel</span>
-                            </a>
+                        <div className="pt-4 mt-4 border-t border-gray-700 w-full flex flex-col items-center space-y-4">
+                           {user ? (
+                                <>
+                                    <button onClick={handleDashboardClick} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-yellow-400 hover:bg-gray-800 w-full text-center">Dashboard</button>
+                                    <button onClick={() => {onLogout(); setMobileMenuOpen(false);}} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded-full transition-colors w-48 text-center">Logout</button>
+                                </>
+                           ) : (
+                               <>
+                                    <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-yellow-400 hover:bg-gray-800 w-full text-center">Login</button>
+                                    <button onClick={() => { onNavigate('signup'); setMobileMenuOpen(false); }} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-2 px-4 rounded-full transition-colors w-48 text-center">Sign Up</button>
+                               </>
+                           )}
                         </div>
                     </nav>
                 </div>

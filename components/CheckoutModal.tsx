@@ -1,17 +1,6 @@
-
 import React, { useState } from 'react';
 import type { FundingPackage } from '../types';
 import { PAYMENT_DETAILS, CONTACT_PHONE } from '../constants';
-
-// Placeholder QR Code component
-const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 160 }) => (
-    <div style={{ width: size, height: size }} className="p-2 bg-white rounded-lg flex items-center justify-center mx-auto">
-        <svg width={size-16} height={size-16} viewBox="0 0 100 100" className="text-gray-800">
-            <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fontSize="10">QR Code for:</text>
-            <text x="50" y="65" dominantBaseline="middle" textAnchor="middle" fontSize="8">{value.substring(0, 12)}...</text>
-        </svg>
-    </div>
-);
 
 interface CheckoutModalProps {
     pkg: FundingPackage | null;
@@ -70,16 +59,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({ pkg, onClose }) => {
                         {/* Left side: Payment Info */}
                         <div className="space-y-6">
                             <h3 className="text-xl font-semibold text-white">1. Make Payment</h3>
-                            <div className="p-4 bg-gray-800 rounded-lg">
-                                <QRCode value={PAYMENT_DETAILS.trc20Address} />
-                            </div>
-                            <div>
-                               <label className="text-sm text-gray-400">USDT TRC20 Address</label>
-                               <div className="flex items-center bg-gray-700 p-3 rounded-lg mt-1">
-                                  <span className="font-mono text-sm break-all flex-grow">{PAYMENT_DETAILS.trc20Address}</span>
-                                  <button onClick={() => copyToClipboard(PAYMENT_DETAILS.trc20Address)} className="ml-2 flex-shrink-0 bg-yellow-500 text-black px-3 py-1 text-xs font-bold rounded hover:bg-yellow-400">Copy</button>
-                               </div>
-                            </div>
+                             <div className="p-4 bg-gray-800 rounded-lg space-y-4">
+                                <div>
+                                    <label className="text-sm text-gray-400">Binance ID</label>
+                                    <div className="flex items-center bg-gray-700 p-3 rounded-lg mt-1">
+                                      <span className="font-mono text-sm break-all flex-grow">{PAYMENT_DETAILS.binanceId}</span>
+                                   </div>
+                                </div>
+                                <div>
+                                   <label className="text-sm text-gray-400">USDT TRC20 Address</label>
+                                   <div className="flex items-center bg-gray-700 p-3 rounded-lg mt-1">
+                                      <span className="font-mono text-sm break-all flex-grow">{PAYMENT_DETAILS.trc20Address}</span>
+                                      <button onClick={() => copyToClipboard(PAYMENT_DETAILS.trc20Address)} className="ml-2 flex-shrink-0 bg-yellow-500 text-black px-3 py-1 text-xs font-bold rounded hover:bg-yellow-400">Copy</button>
+                                   </div>
+                                </div>
+                             </div>
                             <div className="p-3 bg-blue-900/30 border border-blue-400/50 rounded-lg text-sm text-blue-200">
                                 Send exactly <strong>{pkg.price} USDT</strong> (TRC20) to the address above.
                             </div>
