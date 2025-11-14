@@ -1,3 +1,4 @@
+
 import type { User, AccountStatus } from '../types';
 
 // --- A simple in-browser backend using AI Studio's cloudStore ---
@@ -36,14 +37,22 @@ const createLocalStorageStore = (): typeof window.cs.cloudStore => {
     };
 };
 
+// Memoize the promise to prevent multiple initialization checks.
+let cloudStorePromise: Promise<typeof window.cs.cloudStore> | null = null;
+
 /**
  * Safely gets the cloudStore object, waiting for it to be initialized.
  * If initialization times out, it provides a localStorage-based fallback to prevent app crashes.
+ * This function is memoized to only run the check once per page load.
  */
 const getCloudStore = (): Promise<typeof window.cs.cloudStore> => {
-    return new Promise((resolve) => {
+    if (cloudStorePromise) {
+        return cloudStorePromise;
+    }
+
+    cloudStorePromise = new Promise((resolve) => {
         let attempts = 0;
-        const maxAttempts = 50; // Wait for up to 5 seconds
+        const maxAttempts = 20; // Wait for up to 2 seconds for a faster load experience
         const interval = 100;   // Check every 100ms
 
         const check = () => {
@@ -62,6 +71,8 @@ const getCloudStore = (): Promise<typeof window.cs.cloudStore> => {
 
         check();
     });
+    
+    return cloudStorePromise;
 };
 
 

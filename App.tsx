@@ -45,6 +45,8 @@ const App: React.FC = () => {
             await db.initializeDB();
             await checkSession();
             setIsLoading(false);
+            // After db is initialized and session is checked, handle the initial hash
+            handleHashChange(); 
         };
         init();
     }, []);
@@ -57,24 +59,33 @@ const App: React.FC = () => {
 
     const handleHashChange = useCallback(() => {
         const hash = window.location.hash.substring(1) as Page || 'home';
+
+        // This check prevents the handler from running unnecessarily if the state is already correct.
+        if (hash === currentPage && !isLoading) {
+            return;
+        }
+
         // Protected routes
         const isUserProtected = hash === 'dashboard';
         const isAdminProtected = hash === 'admin';
 
         if ((isUserProtected || isAdminProtected) && !user) {
-            handleNavigate('login');
+            window.location.hash = 'login';
+            // Update current page immediately for responsive UI
+            if (currentPage !== 'login') setCurrentPage('login');
             return;
         }
         if (isAdminProtected && user?.role !== 'admin') {
-            handleNavigate('dashboard');
+            window.location.hash = 'dashboard';
+            if (currentPage !== 'dashboard') setCurrentPage('dashboard');
             return;
         }
         setCurrentPage(hash);
-    }, [user]);
+    }, [user, currentPage, isLoading]);
+
 
     useEffect(() => {
         window.addEventListener('hashchange', handleHashChange);
-        handleHashChange(); // Initial load check
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, [handleHashChange]);
 
@@ -96,8 +107,15 @@ const App: React.FC = () => {
 
     const handleLogin = (loggedInUser: User) => {
         sessionStorage.setItem('userId', loggedInUser.id);
+        const targetPage = loggedInUser.role === 'admin' ? 'admin' : 'dashboard';
+        
+        // Set user and page state together to prevent race conditions
         setUser(loggedInUser);
-        handleNavigate(loggedInUser.role === 'admin' ? 'admin' : 'dashboard');
+        setCurrentPage(targetPage);
+
+        // Update URL hash to match the new state
+        window.location.hash = targetPage;
+        window.scrollTo(0, 0);
     };
 
     const handleLogout = () => {
@@ -108,10 +126,8 @@ const App: React.FC = () => {
     
     // --- Admin Data Management ---
     const fetchAllUsers = async () => {
-        if(user?.role === 'admin') {
-            const users = await db.getAllUsers();
-            setAllUsers(users);
-        }
+        const users = await db.getAllUsers();
+        setAllUsers(users);
     };
 
     useEffect(() => {
@@ -147,7 +163,7 @@ const App: React.FC = () => {
     // --- Modals and Popups ---
     const handleSelectPackage = (pkg: FundingPackage) => {
         if (!user) {
-            handleNavigate('login');
+            handleNavigate('signup');
         } else {
             setSelectedPackage(pkg);
         }
@@ -173,7 +189,7 @@ const App: React.FC = () => {
 
     const renderPage = () => {
         if (isLoading) {
-            return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+            return <div className="min-h-screen bg-black flex items-center justify-center text-white text-xl">Initializing Nova Funding...</div>;
         }
         switch (currentPage) {
             case 'login':
