@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -14,78 +15,133 @@ import SignupPage from './components/SignupPage';
 import ClientDashboard from './components/ClientDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import AdminLoginPage from './components/AdminLoginPage';
-import type { FundingPackage } from './types';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import type { FundingPackage, User } from './types';
+import * as db from './db';
 
-type User = {
-    role: 'user' | 'admin';
-};
+export type Page = 'home' | 'login' | 'signup' | 'dashboard' | 'admin' | 'admin-login' | 'forgot-password';
 
-export type Page = 'home' | 'login' | 'signup' | 'dashboard' | 'admin' | 'admin-login';
-
-const HomePage: React.FC<{
-    onSelectPackage: (pkg: FundingPackage) => void;
-}> = ({ onSelectPackage }) => {
-    const handleScrollToPackages = () => {
-        document.querySelector('#packages')?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    return (
-        <>
-            <Hero onGetFunded={handleScrollToPackages} />
-            <Features />
-            <Packages onSelectPackage={onSelectPackage} />
-            <Rules />
-            <Reviews />
-        </>
-    );
-};
-
+const HomePage: React.FC<{ onSelectPackage: (pkg: FundingPackage) => void; }> = ({ onSelectPackage }) => (
+    <>
+        <Hero onGetFunded={() => document.querySelector('#packages')?.scrollIntoView({ behavior: 'smooth' })} />
+        <Features />
+        <Packages onSelectPackage={onSelectPackage} />
+        <Rules />
+        <Reviews />
+    </>
+);
 
 const App: React.FC = () => {
     const [selectedPackage, setSelectedPackage] = useState<FundingPackage | null>(null);
     const [isPopupVisible, setIsPopupVisible] = useState(false);
     const [user, setUser] = useState<User | null>(null);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
     const [currentPage, setCurrentPage] = useState<Page>('home');
+    const [isLoading, setIsLoading] = useState(true);
 
+    // --- DB Initialization ---
+    useEffect(() => {
+        const init = async () => {
+            await db.initializeDB();
+            await checkSession();
+            setIsLoading(false);
+        };
+        init();
+    }, []);
+    
     // --- Navigation and Routing ---
     const handleNavigate = (page: Page) => {
         window.location.hash = page;
         window.scrollTo(0, 0);
     };
 
+    const handleHashChange = useCallback(() => {
+        const hash = window.location.hash.substring(1) as Page || 'home';
+        // Protected routes
+        const isUserProtected = hash === 'dashboard';
+        const isAdminProtected = hash === 'admin';
+
+        if ((isUserProtected || isAdminProtected) && !user) {
+            handleNavigate('login');
+            return;
+        }
+        if (isAdminProtected && user?.role !== 'admin') {
+            handleNavigate('dashboard');
+            return;
+        }
+        setCurrentPage(hash);
+    }, [user]);
+
     useEffect(() => {
-        const handleHashChange = () => {
-            const hash = window.location.hash.substring(1) as Page || 'home';
-            
-            // Protected routes
-            const isProtected = hash === 'dashboard' || hash === 'admin';
-            if (isProtected && !user) {
-                handleNavigate('login');
-                return;
-            }
-            if (hash === 'admin' && user?.role !== 'admin') {
-                handleNavigate('dashboard');
-                return;
-            }
-
-            setCurrentPage(hash);
-        };
-
         window.addEventListener('hashchange', handleHashChange);
         handleHashChange(); // Initial load check
-
         return () => window.removeEventListener('hashchange', handleHashChange);
-    }, [user]);
-    
+    }, [handleHashChange]);
+
     // --- User and Auth ---
-    const handleLogin = (role: 'user' | 'admin') => {
-        setUser({ role });
-        handleNavigate(role === 'admin' ? 'admin' : 'dashboard');
+    const checkSession = async () => {
+        const userId = sessionStorage.getItem('userId');
+        if (userId) {
+            const loggedInUser = await db.getUserById(userId);
+            if (loggedInUser) {
+                setUser(loggedInUser);
+                if (loggedInUser.role === 'admin') {
+                   await fetchAllUsers();
+                }
+            } else {
+                handleLogout(); // Clean up if user ID is invalid
+            }
+        }
     };
-    
+
+    const handleLogin = (loggedInUser: User) => {
+        sessionStorage.setItem('userId', loggedInUser.id);
+        setUser(loggedInUser);
+        handleNavigate(loggedInUser.role === 'admin' ? 'admin' : 'dashboard');
+    };
+
     const handleLogout = () => {
+        sessionStorage.removeItem('userId');
         setUser(null);
         handleNavigate('home');
+    };
+    
+    // --- Admin Data Management ---
+    const fetchAllUsers = async () => {
+        if(user?.role === 'admin') {
+            const users = await db.getAllUsers();
+            setAllUsers(users);
+        }
+    };
+
+    useEffect(() => {
+        if (currentPage === 'admin' && user?.role === 'admin') {
+            fetchAllUsers();
+        }
+    }, [currentPage, user]);
+    
+    const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
+        const updatedUser = await db.updateUser(userId, updates);
+        if(updatedUser) {
+            await fetchAllUsers(); // Refresh admin list
+            // If the updated user is the one currently logged in, refresh their data
+            if(user?.id === userId) {
+                setUser(updatedUser);
+            }
+            return true;
+        }
+        return false;
+    };
+
+    const handleDeleteUser = async (userId: string) => {
+        if(window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+            const success = await db.deleteUser(userId);
+            if(success) {
+                await fetchAllUsers();
+                 return true;
+            }
+        }
+        return false;
     };
 
     // --- Modals and Popups ---
@@ -97,45 +153,28 @@ const App: React.FC = () => {
         }
     };
 
-    const handleCloseModal = () => {
-        setSelectedPackage(null);
-    };
+    const handleCloseModal = () => setSelectedPackage(null);
 
     // --- Promotional Popup Logic ---
-    const checkAndShowPopup = useCallback(() => {
-        if(currentPage !== 'home') return;
-        const popupDismissed = sessionStorage.getItem('promoPopupDismissed');
-        if (popupDismissed !== 'true') {
-            setIsPopupVisible(true);
-        }
-    }, [currentPage]);
-
     useEffect(() => {
-        const timer = setTimeout(() => {
-            checkAndShowPopup();
-        }, 3500);
-
-        const handleScroll = () => {
-            const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 5;
-            if (isAtBottom) {
-                checkAndShowPopup();
+        const checkAndShowPopup = () => {
+            if (currentPage === 'home' && !sessionStorage.getItem('promoPopupDismissed')) {
+                setIsPopupVisible(true);
             }
         };
-
-        window.addEventListener('scroll', handleScroll);
-
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, [checkAndShowPopup]);
-
+        const timer = setTimeout(checkAndShowPopup, 3500);
+        return () => clearTimeout(timer);
+    }, [currentPage]);
+    
     const dismissPopup = () => {
         sessionStorage.setItem('promoPopupDismissed', 'true');
         setIsPopupVisible(false);
     };
-    
+
     const renderPage = () => {
+        if (isLoading) {
+            return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+        }
         switch (currentPage) {
             case 'login':
                 return <LoginPage onNavigate={handleNavigate} onLogin={handleLogin} />;
@@ -143,26 +182,24 @@ const App: React.FC = () => {
                 return <SignupPage onNavigate={handleNavigate} onLogin={handleLogin} />;
             case 'admin-login':
                 return <AdminLoginPage onNavigate={handleNavigate} onLogin={handleLogin} />;
+            case 'forgot-password':
+                return <ForgotPasswordPage onNavigate={handleNavigate} />;
             case 'dashboard':
-                return <ClientDashboard onNavigate={handleNavigate} />;
+                return user && <ClientDashboard user={user} onNavigate={handleNavigate} />;
             case 'admin':
-                return <AdminDashboard />;
+                return user?.role === 'admin' && <AdminDashboard users={allUsers} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} />;
             case 'home':
             default:
                 return <HomePage onSelectPackage={handleSelectPackage} />;
         }
-    }
+    };
 
     return (
         <div className="bg-black text-white font-sans">
             <Header user={user} onNavigate={handleNavigate} onLogout={handleLogout} />
-            <main>
-                {renderPage()}
-            </main>
+            <main>{renderPage()}</main>
             <Footer />
-            
             {currentPage === 'home' && <NotificationToast />}
-            
             <CheckoutModal pkg={selectedPackage} onClose={handleCloseModal} />
             <PromotionalPopup isVisible={isPopupVisible} onDismiss={dismissPopup} />
         </div>

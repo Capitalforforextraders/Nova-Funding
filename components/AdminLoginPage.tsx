@@ -1,27 +1,37 @@
+
 import React, { useState } from 'react';
 import type { Page } from '../App';
+import type { User } from '../types';
+import { authenticateUser } from '../db';
+
 
 interface AdminLoginPageProps {
     onNavigate: (page: Page) => void;
-    onLogin: (role: 'admin') => void;
+    onLogin: (user: User) => void;
 }
-
-// In a real application, these would not be hardcoded.
-const ADMIN_EMAIL = "admin@novafunding.com";
-const ADMIN_PASSWORD = "adminpassword";
 
 const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onNavigate, onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-            setError('');
-            onLogin('admin');
-        } else {
-            setError('Invalid administrator credentials.');
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const user = await authenticateUser(email, password);
+            if (user && user.role === 'admin') {
+                onLogin(user);
+            } else {
+                setError('Invalid administrator credentials.');
+            }
+        } catch (err) {
+             setError('An error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -38,47 +48,34 @@ const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onNavigate, onLogin }) 
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleLogin}>
                      {error && (
-                        <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-300 text-sm rounded-md">
+                        <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-300 text-sm rounded-md text-center">
                             {error}
                         </div>
                     )}
-                    <div className="rounded-md shadow-sm">
+                    <div className="rounded-md shadow-sm -space-y-px">
                         <div>
                             <label htmlFor="email-address" className="sr-only">Email address</label>
                             <input 
-                                id="email-address" 
-                                name="email" 
-                                type="email" 
-                                autoComplete="email" 
-                                required 
+                                id="email-address" name="email" type="email" autoComplete="email" required 
                                 className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
                         <div>
                            <label htmlFor="password" className="sr-only">Password</label>
                             <input 
-                                id="password" 
-                                name="password" 
-                                type="password" 
-                                autoComplete="current-password" 
-                                required 
+                                id="password" name="password" type="password" autoComplete="current-password" required
                                 className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
-                                placeholder="Password" 
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
                     </div>
 
                     <div>
-                        <button 
-                            type="submit"
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-600"
+                        <button type="submit" disabled={isLoading}
+                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-600 disabled:opacity-50"
                         >
-                            Sign in as Admin
+                            {isLoading ? 'Signing in...' : 'Sign in as Admin'}
                         </button>
                     </div>
                 </form>

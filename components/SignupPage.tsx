@@ -1,23 +1,47 @@
+
 import React, { useState } from 'react';
 import type { Page } from '../App';
+import type { User } from '../types';
+import { createUser } from '../db';
 
 interface SignupPageProps {
     onNavigate: (page: Page) => void;
-    onLogin: (role: 'user') => void; // Signup logs in as user
+    onLogin: (user: User) => void;
 }
 
 const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
+    const [country, setCountry] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSignup = (e: React.FormEvent) => {
+    const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (email && password && name) {
-            // In a real app, you'd register the user
-            onLogin('user');
-        } else {
-            alert('Please fill all fields.');
+        if (!email || !password || !name || !country) {
+            setError('Please fill all fields.');
+            return;
+        }
+        setError('');
+        setIsLoading(true);
+
+        try {
+            const newUser = await createUser({
+                name,
+                email,
+                passwordHash: password, // In production, hash this password before sending.
+                country,
+                accountSize: 0,
+                status: 'pending',
+            });
+            if (newUser) {
+                onLogin(newUser);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to create account.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -30,56 +54,50 @@ const SignupPage: React.FC<SignupPageProps> = ({ onNavigate, onLogin }) => {
                     </h2>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleSignup}>
-                    <div className="rounded-md shadow-sm">
+                    {error && (
+                        <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-300 text-sm rounded-md text-center">
+                            {error}
+                        </div>
+                    )}
+                    <div className="rounded-md shadow-sm -space-y-px">
                         <div>
                              <label htmlFor="full-name" className="sr-only">Full Name</label>
                              <input 
-                                id="full-name" 
-                                name="name" 
-                                type="text" 
-                                required 
+                                id="full-name" name="name" type="text" required 
                                 className="appearance-none rounded-t-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
-                                placeholder="Full Name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)}
                             />
                         </div>
                         <div>
                             <label htmlFor="email-address" className="sr-only">Email address</label>
-                            <input 
-                                id="email-address" 
-                                name="email" 
-                                type="email" 
-                                autoComplete="email" 
-                                required 
+                            <input
+                                id="email-address" name="email" type="email" autoComplete="email" required
                                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)}
+                            />
+                        </div>
+                         <div>
+                             <label htmlFor="country" className="sr-only">Country</label>
+                             <input 
+                                id="country" name="country" type="text" required 
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
+                                placeholder="Country" value={country} onChange={(e) => setCountry(e.target.value)}
                             />
                         </div>
                         <div>
                            <label htmlFor="password" className="sr-only">Password</label>
-                            <input 
-                                id="password" 
-                                name="password" 
-                                type="password" 
-                                autoComplete="new-password" 
-                                required 
+                            <input
+                                id="password" name="password" type="password" autoComplete="new-password" required
                                 className="appearance-none rounded-b-md relative block w-full px-3 py-2 border border-gray-700 bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 focus:z-10 sm:text-sm" 
-                                placeholder="Password" 
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
                             />
                         </div>
                     </div>
-
                     <div>
-                        <button 
-                            type="submit"
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-500"
+                        <button type="submit" disabled={isLoading}
+                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-500 disabled:opacity-50"
                         >
-                            Sign up
+                            {isLoading ? 'Creating account...' : 'Sign up'}
                         </button>
                     </div>
                 </form>

@@ -1,22 +1,35 @@
+
 import React, { useState } from 'react';
 import type { Page } from '../App';
+import type { User } from '../types';
+import { authenticateUser } from '../db';
 
 interface LoginPageProps {
     onNavigate: (page: Page) => void;
-    onLogin: (role: 'user') => void;
+    onLogin: (user: User) => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        // In a real app, you'd validate credentials
-        if (email && password) {
-            onLogin('user');
-        } else {
-            alert('Please enter email and password.');
+        setError('');
+        setIsLoading(true);
+        try {
+            const user = await authenticateUser(email, password);
+            if (user) {
+                onLogin(user);
+            } else {
+                setError('Invalid email or password.');
+            }
+        } catch (err) {
+            setError('An error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
     
@@ -29,6 +42,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLogin }) => {
                     </h2>
                 </div>
                 <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+                     {error && (
+                        <div className="p-3 bg-red-900/50 border border-red-500/50 text-red-300 text-sm rounded-md text-center">
+                            {error}
+                        </div>
+                    )}
                     <div className="rounded-md shadow-sm">
                         <div>
                             <label htmlFor="email-address" className="sr-only">Email address</label>
@@ -59,13 +77,20 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigate, onLogin }) => {
                             />
                         </div>
                     </div>
-
+                     <div className="flex items-center justify-end">
+                        <div className="text-sm">
+                            <button onClick={() => onNavigate('forgot-password')} className="font-medium text-yellow-400 hover:text-yellow-300">
+                                Forgot your password?
+                            </button>
+                        </div>
+                    </div>
                     <div>
                         <button 
                             type="submit"
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-500"
+                            disabled={isLoading}
+                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-yellow-500 disabled:opacity-50"
                         >
-                            Sign in
+                            {isLoading ? 'Signing in...' : 'Sign in'}
                         </button>
                     </div>
                 </form>
